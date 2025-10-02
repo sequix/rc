@@ -1,6 +1,8 @@
 package reader
 import "core:io"
 
+// TODO support rune
+
 // Problem with core:bufio
 // - bufio.reader_read_byte returns actual character when err != nil
 // - bufio.reader_unread_byte cannot unread after bufio.reader_peek

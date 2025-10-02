@@ -3,6 +3,8 @@ import "core:fmt"
 import "core:slice"
 import "core:strings"
 
+// TODO inverse matrix
+
 // row-major layout
 RationalMatrix :: struct {
 	m:   [][]Rational,
@@ -199,3 +201,11 @@ matrix_rref :: proc(a: ^RationalMatrix, allocator := context.allocator) -> ^Rati
 	}
 	return b
 }
+
+/*
+matrix_inverse :: proc(a: ^RationalMatrix) -> ^RationalMatrix {
+	if a.row != a.col {
+		return nil
+	}
+}
+*/

@@ -2,6 +2,8 @@ package main
 import "core:fmt"
 import "rational"
 
+// TODO support comment
+
 VariableType :: enum {
 	Matrix,
 	Rational,
@@ -40,7 +42,7 @@ print_variable :: proc(v: ^Variable) {
 	case .Matrix:
 		rational.print_matrix(v.m)
 	case .Rational:
-		fmt.printfln("%s", rational.to_string(v.rnum, context.temp_allocator))
+		fmt.printfln("%s", rational.to_string(v.rnum, allocator = context.temp_allocator))
 	}
 }
 
@@ -49,6 +51,7 @@ TokenType :: enum {
 	Rational,
 	Assign,
 	Variable,
+	ToDeciaml,
 	Add,
 	Sub,
 	Mul,
@@ -69,13 +72,13 @@ Token :: struct {
 print_token :: proc(tk: Token) {
 	defer free_all(context.temp_allocator)
 	switch tk.type {
-	case .EOF, .Add, .Sub, .Mul, .Div, .RREF, .Print, .Pop:
+	case .EOF, .Add, .Sub, .Mul, .Div, .RREF, .Print, .Pop, .ToDeciaml:
 		fmt.printfln("Token{{type=\"%s\"}}", tk.type)
 	case .Rational:
 		fmt.printfln(
 			"Token{{type=\"%s\",rnum=\"%s\"}}",
 			tk.type,
-			rational.to_string(tk.rnum, context.temp_allocator),
+			rational.to_string(tk.rnum, allocator = context.temp_allocator),
 		)
 	case .Variable:
 		fmt.printfln("Token{{type=\"%s\",name=\"%c\"}}", tk.type, tk.name)

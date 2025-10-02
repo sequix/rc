@@ -1,5 +1,8 @@
-matrix:
+rc:
 	odin build . -out:rc
 	./rc input
 
-.PHONY: matrix
+clean:
+	rm -f ./rc
+
+.PHONY: rc clean

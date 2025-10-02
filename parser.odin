@@ -7,6 +7,7 @@ import "core:unicode"
 import "rational"
 import "reader"
 
+// TODO better error message
 // TODO generate parser code with lex and yacc/bison
 
 next_token :: proc(r: ^reader.Reader) -> (tk: Token) {
@@ -72,7 +73,7 @@ parse_word :: proc(r: ^reader.Reader) -> (tk: Token) {
 	bufp := 0
 	for {
 		c = reader.getchar(r)
-		if unicode.is_lower(rune(c)) {
+		if unicode.is_lower(rune(c)) || c == '_' {
 			buf[bufp] = u8(c)
 			bufp += 1
 			continue
@@ -80,13 +81,19 @@ parse_word :: proc(r: ^reader.Reader) -> (tk: Token) {
 		break
 	}
 	reader.ungetc(r, c)
-	switch string(buf[:bufp]) {
+	word := string(buf[:bufp])
+	switch word {
 	case "pop":
 		tk.type = .Pop
 	case "print", "p":
 		tk.type = .Print
 	case "ref", "r":
 		tk.type = .RREF
+	case "to_decimal":
+		tk.type = .ToDeciaml
+	case:
+		fmt.eprintfln("invalid word '%s'", word)
+		os.exit(1)
 	}
 	return tk
 }

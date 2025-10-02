@@ -5,6 +5,8 @@ import "core:strconv"
 import "rational"
 import "reader"
 
+// TODO unit test harness
+
 // [a-zA-Z] -> Variable
 variableMap: map[u8]^Variable
 variableStack: [dynamic]^Variable
@@ -18,7 +20,7 @@ main :: proc() {
 	input := os.stdin
 	if len(os.args) == 2 {
 		err: os.Error
-		input, err = os.open(os.args[1], os.O_RDONLY)
+		input, err = os.open(os.args[1])
 		if err != nil {
 			fmt.eprintfln("failed to open %s: %s", os.args[1], os.error_string(err))
 			os.exit(1)
@@ -37,6 +39,8 @@ main :: proc() {
 		case .EOF:
 			op_print()
 			break mainLoop
+		case .ToDeciaml:
+			op_to_decimal()
 		case .Pop:
 			op_pop()
 		case .Rational:
@@ -71,7 +75,7 @@ op_print :: proc() {
 			case .Matrix:
 				fmt.printf("%s ", rational.matrix_to_string(v.m, context.temp_allocator))
 			case .Rational:
-				fmt.printf("%s ", rational.to_string(v.rnum, context.temp_allocator))
+				fmt.printf("%s ", rational.to_string(v.rnum, allocator = context.temp_allocator))
 			}
 		}
 		fmt.println()
@@ -86,6 +90,17 @@ op_pop :: proc() {
 	v := pop(&variableStack)
 	defer free(v)
 	print_variable(v)
+}
+
+op_to_decimal :: proc() {
+	v := pop(&variableStack)
+	defer free(v)
+	defer free_all(context.temp_allocator)
+	if v.type != .Rational {
+		fmt.eprintfln("expected rational for to_decimal")
+		os.exit(1)
+	}
+	fmt.println(rational.to_string(v.rnum, decimal = true, allocator = context.temp_allocator))
 }
 
 op_rational :: proc(tk: Token) {
