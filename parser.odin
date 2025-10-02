@@ -7,9 +7,6 @@ import "core:unicode"
 import "rational"
 import "reader"
 
-// TODO better error message
-// TODO generate parser code with lex and yacc/bison
-
 next_token :: proc(r: ^reader.Reader) -> (tk: Token) {
 	advance_spaces(r)
 	c := reader.getchar(r)
@@ -91,6 +88,8 @@ parse_word :: proc(r: ^reader.Reader) -> (tk: Token) {
 		tk.type = .RREF
 	case "to_decimal":
 		tk.type = .ToDeciaml
+	case "inv":
+		tk.type = .Inverse
 	case:
 		fmt.eprintfln("invalid word '%s'", word)
 		os.exit(1)

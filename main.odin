@@ -5,8 +5,6 @@ import "core:strconv"
 import "rational"
 import "reader"
 
-// TODO unit test harness
-
 // [a-zA-Z] -> Variable
 variableMap: map[u8]^Variable
 variableStack: [dynamic]^Variable
@@ -43,6 +41,8 @@ main :: proc() {
 			op_to_decimal()
 		case .Pop:
 			op_pop()
+		case .Inverse:
+			op_inverse()
 		case .Rational:
 			op_rational(tk)
 		case .Variable:
@@ -274,5 +274,22 @@ op_rref :: proc() {
 	nv := new(Variable)
 	nv.type = .Matrix
 	nv.m = rational.matrix_rref(a.m)
+	append(&variableStack, nv)
+}
+
+op_inverse :: proc() {
+	if len(variableStack) < 1 {
+		fmt.eprintln("expected at least 1 elements")
+		os.exit(1)
+	}
+	a := pop(&variableStack)
+	defer free_variable(a)
+	if a.type != .Matrix {
+		fmt.eprintfln("expected matrix for Inverse")
+		os.exit(1)
+	}
+	nv := new(Variable)
+	nv.type = .Matrix
+	nv.m = rational.matrix_inverse(a.m)
 	append(&variableStack, nv)
 }

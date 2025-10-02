@@ -2,9 +2,6 @@ package rational
 import "core:fmt"
 import "core:strings"
 
-// TODO decimal to rational
-// TODO arbitary precision
-
 Rational :: struct {
 	num: i32,
 	den: i32,

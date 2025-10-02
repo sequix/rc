@@ -3,8 +3,6 @@ import "core:fmt"
 import "core:slice"
 import "core:strings"
 
-// TODO inverse matrix
-
 // row-major layout
 RationalMatrix :: struct {
 	m:   [][]Rational,
@@ -147,65 +145,98 @@ matrix_mul_rational :: proc(
 	return r
 }
 
-matrix_rref :: proc(a: ^RationalMatrix, allocator := context.allocator) -> ^RationalMatrix {
-	b := clone_matrix(a)
+matrix_rref_in_place :: proc(a: ^RationalMatrix) {
 	r := 0
 	c := 0
-	for r < b.row && c < b.col {
+	for r < a.row && c < a.col {
 		// find row with max absolute value of column c
 		rmax := r
-		for ri := r + 1; ri < b.row; ri += 1 {
-			if cmp(b.m[ri][c], b.m[rmax][c]) > 0 {
+		for ri := r + 1; ri < a.row; ri += 1 {
+			if cmp(a.m[ri][c], a.m[rmax][c]) > 0 {
 				rmax = ri
 			}
 		}
 		// make rmax row current row
 		if rmax != r {
-			b.m[rmax], b.m[r] = b.m[r], b.m[rmax]
+			a.m[rmax], a.m[r] = a.m[r], a.m[rmax]
 		}
 		// make current row curent column 1
-		cof := b.m[r][c]
-		b.m[r][c] = Rational{1, 1}
-		for ci := c + 1; ci < b.col; ci += 1 {
-			b.m[r][ci] = div(b.m[r][ci], cof)
+		cof := a.m[r][c]
+		a.m[r][c] = Rational{1, 1}
+		for ci := c + 1; ci < a.col; ci += 1 {
+			a.m[r][ci] = div(a.m[r][ci], cof)
 		}
 		// make following row current column 0
-		for ri := r + 1; ri < b.row; ri += 1 {
-			cof := b.m[ri][c]
-			b.m[ri][c] = Rational{0, 1}
-			for ci := c + 1; ci < b.col; ci += 1 {
-				t := mul(b.m[r][ci], cof)
-				b.m[ri][ci] = sub(b.m[ri][ci], t)
+		for ri := r + 1; ri < a.row; ri += 1 {
+			cof := a.m[ri][c]
+			a.m[ri][c] = Rational{0, 1}
+			for ci := c + 1; ci < a.col; ci += 1 {
+				t := mul(a.m[r][ci], cof)
+				a.m[ri][ci] = sub(a.m[ri][ci], t)
 			}
 		}
 		r += 1
 		c += 1
 	}
-	for r = b.row - 1; r >= 0; r -= 1 {
-		for c = 0; c < b.col; c += 1 {
-			if b.m[r][c].num != 0 {
+	for r = a.row - 1; r >= 0; r -= 1 {
+		for c = 0; c < a.col; c += 1 {
+			if a.m[r][c].num != 0 {
 				break
 			}
 		}
-		if c == b.col {
+		if c == a.col {
 			continue
 		}
 		for ri := r - 1; ri >= 0; ri -= 1 {
-			cof := b.m[ri][c]
-			b.m[ri][c] = Rational{0, 1}
-			for ci := c + 1; ci < b.col; ci += 1 {
-				t := mul(b.m[r][ci], cof)
-				b.m[ri][ci] = sub(b.m[ri][ci], t)
+			cof := a.m[ri][c]
+			a.m[ri][c] = Rational{0, 1}
+			for ci := c + 1; ci < a.col; ci += 1 {
+				t := mul(a.m[r][ci], cof)
+				a.m[ri][ci] = sub(a.m[ri][ci], t)
 			}
 		}
 	}
+}
+
+matrix_rref :: proc(a: ^RationalMatrix, allocator := context.allocator) -> ^RationalMatrix {
+	b := clone_matrix(a)
+	matrix_rref_in_place(b)
 	return b
 }
 
-/*
-matrix_inverse :: proc(a: ^RationalMatrix) -> ^RationalMatrix {
+matrix_inverse :: proc(a: ^RationalMatrix, allocator := context.allocator) -> ^RationalMatrix {
 	if a.row != a.col {
 		return nil
 	}
+	t := new_matrix(a.row, a.col << 1, allocator = allocator)
+	defer free_matrix(t)
+
+	for r in 0 ..< a.row {
+		for c in 0 ..< a.col {
+			t.m[r][c] = a.m[r][c]
+		}
+		t.m[r][r + a.col] = Rational{1, 1}
+	}
+	matrix_rref_in_place(t)
+
+	for r in 0 ..< a.row {
+		for c in 0 ..< a.col {
+			if r != c {
+				if t.m[r][c].num != 0 {
+					return nil
+				}
+			} else {
+				if cmp(t.m[r][c], Rational{1,1}) != 0 {
+					return nil
+				}
+			}
+		}
+	}
+	ret := new_matrix(a.row, a.col, allocator = allocator)
+	for r in 0 ..< ret.row {
+		for c in 0 ..< ret.col {
+			ret.m[r][c] = t.m[r][c + ret.col]
+		}
+	}
+	return ret
 }
-*/

@@ -52,6 +52,7 @@ TokenType :: enum {
 	Assign,
 	Variable,
 	ToDeciaml,
+	Inverse,
 	Add,
 	Sub,
 	Mul,
@@ -71,9 +72,7 @@ Token :: struct {
 
 print_token :: proc(tk: Token) {
 	defer free_all(context.temp_allocator)
-	switch tk.type {
-	case .EOF, .Add, .Sub, .Mul, .Div, .RREF, .Print, .Pop, .ToDeciaml:
-		fmt.printfln("Token{{type=\"%s\"}}", tk.type)
+	#partial switch tk.type {
 	case .Rational:
 		fmt.printfln(
 			"Token{{type=\"%s\",rnum=\"%s\"}}",
@@ -90,5 +89,7 @@ print_token :: proc(tk: Token) {
 			tk.row,
 			tk.col,
 		)
+	case:
+		fmt.printfln("Token{{type=\"%s\"}}", tk.type)
 	}
 }
