@@ -2,9 +2,8 @@
 
 TODO
 - decimal to rational
+- conversion between rational and float
 - arbitary precision
 - support rune
-- support comment
-- better error message
 - generate parser code with lex and yacc/bison
-- unit test harness
+- unit test

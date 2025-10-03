@@ -2,7 +2,19 @@ package main
 import "core:fmt"
 import "rational"
 
-// TODO support comment
+Error :: union {
+	MainError,
+	rational.Error,
+}
+
+MainError :: enum {
+	None,
+	OperandsNotEnough,
+	VariableNotAssigned,
+	ExpectedRational,
+	ExpectedMatrix,
+	ExpectedSameType,
+}
 
 VariableType :: enum {
 	Matrix,
@@ -70,26 +82,33 @@ Token :: struct {
 	col:  int,
 }
 
-print_token :: proc(tk: Token) {
-	defer free_all(context.temp_allocator)
+token_to_string :: proc(tk: Token, allocator := context.allocator) -> string {
 	#partial switch tk.type {
 	case .Rational:
-		fmt.printfln(
+		return fmt.aprintf(
 			"Token{{type=\"%s\",rnum=\"%s\"}}",
 			tk.type,
-			rational.to_string(tk.rnum, allocator = context.temp_allocator),
+			rational.to_string(tk.rnum, allocator = allocator),
+			allocator = allocator,
 		)
 	case .Variable:
-		fmt.printfln("Token{{type=\"%s\",name=\"%c\"}}", tk.type, tk.name)
+		return fmt.aprintf(
+			"Token{{type=\"%s\",name=\"%c\"}}",
+			tk.type,
+			tk.name,
+			allocator = allocator,
+		)
 	case .Assign:
-		fmt.printfln(
+		return fmt.aprintf(
 			"Token{{type=\"%s\",name=\"%c\",row=\"%d\",col=\"%d\"}}",
 			tk.type,
 			tk.name,
 			tk.row,
 			tk.col,
+			allocator = allocator,
 		)
 	case:
-		fmt.printfln("Token{{type=\"%s\"}}", tk.type)
+		return fmt.aprintf("Token{{type=\"%s\"}}", tk.type, allocator = context.temp_allocator)
 	}
+	return "unreachable"
 }

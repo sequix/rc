@@ -8,15 +8,22 @@ import "rational"
 import "reader"
 
 next_token :: proc(r: ^reader.Reader) -> (tk: Token) {
-	advance_spaces(r)
-	c := reader.getchar(r)
-	if c < 0 {
-		if r.err == io.Error.EOF {
-			tk.type = .EOF
-			return
+	c: i16
+	for {
+		advance_spaces(r)
+		c = reader.getchar(r)
+		if c < 0 {
+			if r.err == io.Error.EOF {
+				tk.type = .EOF
+				return
+			}
+			fmt.eprintfln("Error at line #%d: I/O error: %s", r.lno, r.err)
+			os.exit(1)
 		}
-		fmt.eprintfln("io error: %s", r.err)
-		os.exit(1)
+		if c != '#' {
+			break
+		}
+		advance_comment(r)
 	}
 	switch c {
 	case '*':
@@ -201,14 +208,22 @@ advance_spaces :: proc(r: ^reader.Reader) {
 	for {
 		c := reader.getchar(r)
 		if c == -1 {
-			if r.err == io.Error.EOF {
-				return
-			}
-			fmt.eprintfln("io error: %s", r.err)
-			os.exit(1)
+			return
 		}
 		if !unicode.is_space(rune(c)) {
 			reader.ungetc(r, c)
+			return
+		}
+	}
+}
+
+advance_comment :: proc(r: ^reader.Reader) {
+	for {
+		c := reader.getchar(r)
+		if c == -1 {
+			return
+		}
+		if c == '\n' {
 			return
 		}
 	}

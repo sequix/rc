@@ -11,8 +11,11 @@ Reader :: struct {
 	p:      int,
 	// how many bytes in buf
 	n:      int,
-	buf:    []u8,
+	// current line number
+	lno:    int,
+	// only supprt unread one byte
 	unread: i16,
+	buf:    []u8,
 	err:    io.Error,
 }
 
@@ -20,14 +23,20 @@ init :: proc(r: ^Reader, s: io.Stream, buf: []u8) {
 	r.s = s
 	r.p = 0
 	r.n = 0
-	r.buf = buf
+	r.lno = 1
 	r.unread = -1
+	r.buf = buf
 	r.err = nil
 }
 
 getchar :: proc(r: ^Reader) -> (c: i16) {
 	if r.err != nil {
 		return -1
+	}
+	defer {
+		if c == '\n' {
+			r.lno += 1
+		}
 	}
 	if r.unread != -1 {
 		c = r.unread
@@ -48,4 +57,7 @@ getchar :: proc(r: ^Reader) -> (c: i16) {
 
 ungetc :: proc(r: ^Reader, c: i16) {
 	r.unread = c
+	if c == '\n' {
+		r.lno -= 1
+	}
 }

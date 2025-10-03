@@ -3,6 +3,12 @@ import "core:fmt"
 import "core:slice"
 import "core:strings"
 
+Error :: enum {
+	None,
+	MatrixMismatchShape,
+	MatrixNotInvertible,
+}
+
 // row-major layout
 RationalMatrix :: struct {
 	m:   [][]Rational,
@@ -83,12 +89,15 @@ print_matrix :: proc(a: ^RationalMatrix) {
 	}
 }
 
-matrix_add :: proc(a, b: ^RationalMatrix, allocator := context.allocator) -> ^RationalMatrix {
-	if a.row != b.row {
-		return nil
-	}
-	if a.col != b.col {
-		return nil
+matrix_add :: proc(
+	a, b: ^RationalMatrix,
+	allocator := context.allocator,
+) -> (
+	^RationalMatrix,
+	Error,
+) {
+	if a.row != b.row || a.col != b.col {
+		return nil, .MatrixMismatchShape
 	}
 	r := new_matrix(a.row, a.col, allocator)
 	for i in 0 ..< r.row {
@@ -96,15 +105,18 @@ matrix_add :: proc(a, b: ^RationalMatrix, allocator := context.allocator) -> ^Ra
 			r.m[i][j] = add(a.m[i][j], b.m[i][j])
 		}
 	}
-	return r
+	return r, nil
 }
 
-matrix_sub :: proc(a, b: ^RationalMatrix, allocator := context.allocator) -> ^RationalMatrix {
-	if a.row != b.row {
-		return nil
-	}
-	if a.col != b.col {
-		return nil
+matrix_sub :: proc(
+	a, b: ^RationalMatrix,
+	allocator := context.allocator,
+) -> (
+	^RationalMatrix,
+	Error,
+) {
+	if a.row != b.row || a.col != b.col {
+		return nil, .MatrixMismatchShape
 	}
 	r := new_matrix(a.row, a.col, allocator)
 	for i in 0 ..< r.row {
@@ -112,12 +124,18 @@ matrix_sub :: proc(a, b: ^RationalMatrix, allocator := context.allocator) -> ^Ra
 			r.m[i][j] = sub(a.m[i][j], b.m[i][j])
 		}
 	}
-	return r
+	return r, nil
 }
 
-matrix_mul :: proc(a, b: ^RationalMatrix, allocator := context.allocator) -> ^RationalMatrix {
+matrix_mul :: proc(
+	a, b: ^RationalMatrix,
+	allocator := context.allocator,
+) -> (
+	^RationalMatrix,
+	Error,
+) {
 	if a.col != b.row {
-		return nil
+		return nil, .MatrixMismatchShape
 	}
 	r := new_matrix(a.row, b.col, allocator)
 	for i in 0 ..< r.row {
@@ -128,7 +146,7 @@ matrix_mul :: proc(a, b: ^RationalMatrix, allocator := context.allocator) -> ^Ra
 			}
 		}
 	}
-	return r
+	return r, nil
 }
 
 matrix_mul_rational :: proc(
@@ -148,13 +166,16 @@ matrix_mul_rational :: proc(
 matrix_rref_in_place :: proc(a: ^RationalMatrix) {
 	r := 0
 	c := 0
-	for r < a.row && c < a.col {
+	for ; r < a.row && c < a.col; r, c = r + 1, c + 1 {
 		// find row with max absolute value of column c
 		rmax := r
 		for ri := r + 1; ri < a.row; ri += 1 {
 			if cmp(a.m[ri][c], a.m[rmax][c]) > 0 {
 				rmax = ri
 			}
+		}
+		if a.m[rmax][c].num == 0 {
+			continue
 		}
 		// make rmax row current row
 		if rmax != r {
@@ -169,14 +190,14 @@ matrix_rref_in_place :: proc(a: ^RationalMatrix) {
 		// make following row current column 0
 		for ri := r + 1; ri < a.row; ri += 1 {
 			cof := a.m[ri][c]
-			a.m[ri][c] = Rational{0, 1}
-			for ci := c + 1; ci < a.col; ci += 1 {
-				t := mul(a.m[r][ci], cof)
-				a.m[ri][ci] = sub(a.m[ri][ci], t)
+			if cof.num != 0 {
+				a.m[ri][c] = Rational{0, 1}
+				for ci := c + 1; ci < a.col; ci += 1 {
+					t := mul(a.m[r][ci], cof)
+					a.m[ri][ci] = sub(a.m[ri][ci], t)
+				}
 			}
 		}
-		r += 1
-		c += 1
 	}
 	for r = a.row - 1; r >= 0; r -= 1 {
 		for c = 0; c < a.col; c += 1 {
@@ -189,10 +210,12 @@ matrix_rref_in_place :: proc(a: ^RationalMatrix) {
 		}
 		for ri := r - 1; ri >= 0; ri -= 1 {
 			cof := a.m[ri][c]
-			a.m[ri][c] = Rational{0, 1}
-			for ci := c + 1; ci < a.col; ci += 1 {
-				t := mul(a.m[r][ci], cof)
-				a.m[ri][ci] = sub(a.m[ri][ci], t)
+			if cof.num != 0 {
+				a.m[ri][c] = Rational{0, 1}
+				for ci := c + 1; ci < a.col; ci += 1 {
+					t := mul(a.m[r][ci], cof)
+					a.m[ri][ci] = sub(a.m[ri][ci], t)
+				}
 			}
 		}
 	}
@@ -204,9 +227,15 @@ matrix_rref :: proc(a: ^RationalMatrix, allocator := context.allocator) -> ^Rati
 	return b
 }
 
-matrix_inverse :: proc(a: ^RationalMatrix, allocator := context.allocator) -> ^RationalMatrix {
+matrix_inverse :: proc(
+	a: ^RationalMatrix,
+	allocator := context.allocator,
+) -> (
+	^RationalMatrix,
+	Error,
+) {
 	if a.row != a.col {
-		return nil
+		return nil, .MatrixNotInvertible
 	}
 	t := new_matrix(a.row, a.col << 1, allocator = allocator)
 	defer free_matrix(t)
@@ -223,11 +252,11 @@ matrix_inverse :: proc(a: ^RationalMatrix, allocator := context.allocator) -> ^R
 		for c in 0 ..< a.col {
 			if r != c {
 				if t.m[r][c].num != 0 {
-					return nil
+					return nil, .MatrixNotInvertible
 				}
 			} else {
-				if cmp(t.m[r][c], Rational{1,1}) != 0 {
-					return nil
+				if cmp(t.m[r][c], Rational{1, 1}) != 0 {
+					return nil, .MatrixNotInvertible
 				}
 			}
 		}
@@ -238,5 +267,5 @@ matrix_inverse :: proc(a: ^RationalMatrix, allocator := context.allocator) -> ^R
 			ret.m[r][c] = t.m[r][c + ret.col]
 		}
 	}
-	return ret
+	return ret, nil
 }

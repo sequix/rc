@@ -28,41 +28,52 @@ main :: proc() {
 
 	r: reader.Reader
 	buf: [1024]u8
+	err: Error
+	tk: Token
 	reader.init(&r, os.stream_from_handle(input), buf[:])
 
 	mainLoop: for {
-		tk := next_token(&r)
-		//print_token(tk)
+		tk = next_token(&r)
 		switch tk.type {
 		case .EOF:
 			op_print()
 			break mainLoop
-		case .ToDeciaml:
-			op_to_decimal()
-		case .Pop:
-			op_pop()
-		case .Inverse:
-			op_inverse()
-		case .Rational:
-			op_rational(tk)
-		case .Variable:
-			op_variable(tk)
-		case .Assign:
-			op_assign(tk)
-		case .Add:
-			op_add()
-		case .Sub:
-			op_sub()
-		case .Mul:
-			op_mul()
-		case .Div:
-			op_div()
-		case .RREF:
-			op_rref()
 		case .Print:
 			op_print()
+		case .Rational:
+			op_rational(tk)
+		case .Pop:
+			err = op_pop()
+		case .ToDeciaml:
+			err = op_to_decimal()
+		case .Variable:
+			err = op_variable(tk)
+		case .Assign:
+			err = op_assign(tk)
+		case .Add:
+			err = op_add()
+		case .Sub:
+			err = op_sub()
+		case .Mul:
+			err = op_mul()
+		case .Div:
+			err = op_div()
+		case .RREF:
+			err = op_rref()
+		case .Inverse:
+			err = op_inverse()
+		}
+		if err != nil {
+			print_error(&r, tk, err)
+			os.exit(1)
 		}
 	}
+}
+
+print_error :: proc(r: ^reader.Reader, tk: Token, err: Error) {
+	defer free_all(context.temp_allocator)
+	ts := token_to_string(tk, allocator = context.temp_allocator)
+	fmt.eprintfln("Error at line #%d: %s %s", r.lno, ts, err)
 }
 
 op_print :: proc() {
@@ -86,21 +97,28 @@ op_print :: proc() {
 	}
 }
 
-op_pop :: proc() {
+op_pop :: proc() -> Error {
+	if len(variableStack) == 0 {
+		return .OperandsNotEnough
+	}
 	v := pop(&variableStack)
 	defer free(v)
 	print_variable(v)
+	return nil
 }
 
-op_to_decimal :: proc() {
+op_to_decimal :: proc() -> Error {
+	if len(variableStack) == 0 {
+		return .OperandsNotEnough
+	}
 	v := pop(&variableStack)
 	defer free(v)
 	defer free_all(context.temp_allocator)
 	if v.type != .Rational {
-		fmt.eprintfln("expected rational for to_decimal")
-		os.exit(1)
+		return .ExpectedRational
 	}
 	fmt.println(rational.to_string(v.rnum, decimal = true, allocator = context.temp_allocator))
+	return nil
 }
 
 op_rational :: proc(tk: Token) {
@@ -110,20 +128,19 @@ op_rational :: proc(tk: Token) {
 	append(&variableStack, v)
 }
 
-op_variable :: proc(tk: Token) {
+op_variable :: proc(tk: Token) -> Error {
 	v := variableMap[tk.name]
 	if v == nil {
-		fmt.eprintfln("variable '%c' not assigned", tk.name)
-		os.exit(1)
+		return .VariableNotAssigned
 	}
 	cv := clone_variable(v^)
 	append(&variableStack, cv)
+	return nil
 }
 
-op_assign :: proc(tk: Token) {
+op_assign :: proc(tk: Token) -> Error {
 	if len(variableStack) == 0 {
-		fmt.eprintfln("cannot assign from empty stack")
-		os.exit(1)
+		return .OperandsNotEnough
 	}
 
 	// =X
@@ -132,13 +149,12 @@ op_assign :: proc(tk: Token) {
 		defer free_variable(pv)
 		nv := clone_variable(pv^)
 		variableMap[tk.name] = nv
-		return
+		return nil
 	}
 
 	// =X(r,c)
 	if len(variableStack) < tk.row * tk.col {
-		fmt.eprintfln("expected %dx%d elements", tk.row, tk.col)
-		os.exit(1)
+		return .OperandsNotEnough
 	}
 	m := rational.new_matrix(tk.row, tk.col)
 	for i := tk.row - 1; i >= 0; i -= 1 {
@@ -146,8 +162,7 @@ op_assign :: proc(tk: Token) {
 			v := pop(&variableStack)
 			defer free_variable(v)
 			if v.type != .Rational {
-				fmt.eprintfln("expected rational number for matrix got %s", v.type)
-				os.exit(1)
+				return .ExpectedRational
 			}
 			m.m[i][j] = v.rnum
 		}
@@ -157,21 +172,19 @@ op_assign :: proc(tk: Token) {
 	nv.type = .Matrix
 	nv.m = m
 	variableMap[tk.name] = nv
-	return
+	return nil
 }
 
-op_add :: proc() {
+op_add :: proc() -> Error {
 	if len(variableStack) < 2 {
-		fmt.eprintln("expected at least 2 elements")
-		os.exit(1)
+		return .OperandsNotEnough
 	}
 	b := pop(&variableStack)
 	a := pop(&variableStack)
 	defer free_variable(a)
 	defer free_variable(b)
 	if a.type != b.type {
-		fmt.eprintln("expected same type for '+'")
-		os.exit(1)
+		return .ExpectedSameType
 	}
 	nv := new(Variable)
 	nv.type = a.type
@@ -179,23 +192,22 @@ op_add :: proc() {
 	case .Rational:
 		nv.rnum = rational.add(a.rnum, b.rnum)
 	case .Matrix:
-		nv.m = rational.matrix_add(a.m, b.m)
+		nv.m = rational.matrix_add(a.m, b.m) or_return
 	}
 	append(&variableStack, nv)
+	return nil
 }
 
-op_sub :: proc() {
+op_sub :: proc() -> Error {
 	if len(variableStack) < 2 {
-		fmt.eprintln("expected at least 2 elements")
-		os.exit(1)
+		return .OperandsNotEnough
 	}
 	b := pop(&variableStack)
 	a := pop(&variableStack)
 	defer free_variable(a)
 	defer free_variable(b)
 	if a.type != b.type {
-		fmt.eprintln("expected same type for '-'")
-		os.exit(1)
+		return .ExpectedSameType
 	}
 	nv := new(Variable)
 	nv.type = a.type
@@ -203,15 +215,15 @@ op_sub :: proc() {
 	case .Rational:
 		nv.rnum = rational.sub(a.rnum, b.rnum)
 	case .Matrix:
-		nv.m = rational.matrix_sub(a.m, b.m)
+		nv.m = rational.matrix_sub(a.m, b.m) or_return
 	}
 	append(&variableStack, nv)
+	return nil
 }
 
-op_mul :: proc() {
+op_mul :: proc() -> Error {
 	if len(variableStack) < 2 {
-		fmt.eprintln("expected at least 2 elements")
-		os.exit(1)
+		return .OperandsNotEnough
 	}
 	b := pop(&variableStack)
 	a := pop(&variableStack)
@@ -224,7 +236,7 @@ op_mul :: proc() {
 		case .Rational:
 			nv.rnum = rational.mul(a.rnum, b.rnum)
 		case .Matrix:
-			nv.m = rational.matrix_mul(a.m, b.m)
+			nv.m = rational.matrix_mul(a.m, b.m) or_return
 		}
 	} else {
 		nv.type = .Matrix
@@ -235,61 +247,58 @@ op_mul :: proc() {
 		}
 	}
 	append(&variableStack, nv)
+	return nil
 }
 
-op_div :: proc() {
+op_div :: proc() -> Error {
 	if len(variableStack) < 2 {
-		fmt.eprintln("expected at least 2 elements")
-		os.exit(1)
+		return .OperandsNotEnough
 	}
 	b := pop(&variableStack)
 	a := pop(&variableStack)
 	defer free_variable(a)
 	defer free_variable(b)
 	if a.type != b.type {
-		fmt.eprintln("expected same type for '-'")
-		os.exit(1)
+		return .ExpectedSameType
 	}
 	if a.type == .Matrix {
-		fmt.eprintfln("expected rationals for '/'")
-		os.exit(1)
+		return .ExpectedRational
 	}
 	nv := new(Variable)
 	nv.type = .Rational
 	nv.rnum = rational.div(a.rnum, b.rnum)
 	append(&variableStack, nv)
+	return nil
 }
 
-op_rref :: proc() {
+op_rref :: proc() -> Error {
 	if len(variableStack) < 1 {
-		fmt.eprintln("expected at least 1 elements")
-		os.exit(1)
+		return .OperandsNotEnough
 	}
 	a := pop(&variableStack)
 	defer free_variable(a)
 	if a.type != .Matrix {
-		fmt.eprintfln("expected matrix for RREF")
-		os.exit(1)
+		return .ExpectedMatrix
 	}
 	nv := new(Variable)
 	nv.type = .Matrix
 	nv.m = rational.matrix_rref(a.m)
 	append(&variableStack, nv)
+	return nil
 }
 
-op_inverse :: proc() {
-	if len(variableStack) < 1 {
-		fmt.eprintln("expected at least 1 elements")
-		os.exit(1)
+op_inverse :: proc() -> Error {
+	if len(variableStack) == 0 {
+		return .OperandsNotEnough
 	}
 	a := pop(&variableStack)
 	defer free_variable(a)
 	if a.type != .Matrix {
-		fmt.eprintfln("expected matrix for Inverse")
-		os.exit(1)
+		return .ExpectedMatrix
 	}
 	nv := new(Variable)
 	nv.type = .Matrix
-	nv.m = rational.matrix_inverse(a.m)
+	nv.m = rational.matrix_inverse(a.m) or_return
 	append(&variableStack, nv)
+	return nil
 }
