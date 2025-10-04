@@ -48,6 +48,8 @@ process :: proc(r: ^reader.Reader) {
 			if len(variableStack) > 1 {
 				op_print_stack()
 			}
+			clear(&variableStack)
+			clear(&variableMap)
 			break processLoop
 		case .PrintStack:
 			op_print_stack()

@@ -106,16 +106,26 @@ token_to_string :: proc(tk: Token, allocator := context.allocator) -> string {
 			allocator = allocator,
 		)
 	case .Assign:
-		return fmt.aprintf(
-			"Token{{type=\"%s\",name=\"%c\",row=\"%d\",col=\"%d\"}}",
-			tk.type,
-			tk.name,
-			tk.row,
-			tk.col,
-			allocator = allocator,
-		)
+		if tk.name != 0 {
+			return fmt.aprintf(
+				"Token{{type=\"%s\",name=\"%c\",row=\"%d\",col=\"%d\"}}",
+				tk.type,
+				tk.name,
+				tk.row,
+				tk.col,
+				allocator = allocator,
+			)
+		} else {
+			return fmt.aprintf(
+				"Token{{type=\"%s\",row=\"%d\",col=\"%d\"}}",
+				tk.type,
+				tk.row,
+				tk.col,
+				allocator = allocator,
+			)
+		}
 	case:
-		return fmt.aprintf("Token{{type=\"%s\"}}", tk.type, allocator = context.temp_allocator)
+		return fmt.aprintf("Token{{type=\"%s\"}}", tk.type, allocator = allocator)
 	}
 	return "unreachable"
 }
