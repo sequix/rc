@@ -49,13 +49,18 @@ free_variable :: proc(v: ^Variable) {
 	free(v)
 }
 
-print_variable :: proc(v: ^Variable) {
+variable_to_string :: proc(
+	v: ^Variable,
+	single_line := true,
+	allocator := context.allocator,
+) -> string {
 	switch v.type {
 	case .Matrix:
-		rational.print_matrix(v.m)
+		return rational.matrix_to_string(v.m, single_line = single_line, allocator = allocator)
 	case .Rational:
-		fmt.printfln("%s", rational.to_string(v.rnum, allocator = context.temp_allocator))
+		return rational.to_string(v.rnum, allocator = allocator)
 	}
+	return "unreachable"
 }
 
 TokenType :: enum {
@@ -70,8 +75,10 @@ TokenType :: enum {
 	Mul,
 	Div,
 	RREF,
-	Print,
+	PrintStack,
+	PrintVars,
 	Pop,
+	PopQuietly,
 }
 
 Token :: struct {

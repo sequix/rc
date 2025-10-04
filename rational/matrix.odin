@@ -7,6 +7,7 @@ Error :: enum {
 	None,
 	MatrixMismatchShape,
 	MatrixNotInvertible,
+	DivideByZero,
 }
 
 // row-major layout
@@ -51,42 +52,46 @@ clone_matrix :: proc(a: ^RationalMatrix, allocator := context.allocator) -> ^Rat
 	return r
 }
 
-matrix_to_string :: proc(a: ^RationalMatrix, allocator := context.allocator) -> string {
+matrix_to_string :: proc(
+	a: ^RationalMatrix,
+	single_line := true,
+	decimal := false,
+	allocator := context.allocator,
+) -> string {
 	sb: strings.Builder
 	strings.builder_init_len_cap(&sb, 0, 128, allocator = allocator)
-	fmt.sbprintf(&sb, "Matrix(%d,%d){{", a.row, a.col)
-	for i in 0 ..< a.row {
-		if a.m[i][0].den == 1 {
-			fmt.sbprintf(&sb, "%d", a.m[i][0].num)
-		} else {
-			fmt.sbprintf(&sb, "%d/%d", a.m[i][0].num, a.m[i][0].den)
-		}
-		for j in 1 ..< a.col {
-			if a.m[i][j].den == 1 {
-				fmt.sbprintf(&sb, ",%d", a.m[i][j].num)
-			} else {
-				fmt.sbprintf(&sb, ",%d/%d", a.m[i][j].num, a.m[i][j].den)
-			}
-		}
-		if i < a.row - 1 {
-			fmt.sbprint(&sb, ";")
-		}
-	}
-	return fmt.sbprint(&sb, "}")
-}
 
-print_matrix :: proc(a: ^RationalMatrix) {
-	fmt.printfln("Matrix(%d,%d):", a.row, a.col)
-	for i in 0 ..< a.row {
-		for j in 0 ..< a.col {
-			if a.m[i][j].den == 1 {
-				fmt.printf("%d\t", a.m[i][j].num)
-			} else {
-				fmt.printf("%d/%d\t", a.m[i][j].num, a.m[i][j].den)
+	if single_line {
+		fmt.sbprintf(&sb, "Matrix(%d,%d){{", a.row, a.col)
+		for i in 0 ..< a.row {
+			fmt.sbprint(&sb, to_string(a.m[i][0], decimal = decimal, allocator = allocator))
+			for j in 1 ..< a.col {
+				fmt.sbprintf(
+					&sb,
+					",%s",
+					to_string(a.m[i][j], decimal = decimal, allocator = allocator),
+				)
+			}
+			if i < a.row - 1 {
+				fmt.sbprint(&sb, ";")
 			}
 		}
-		fmt.println()
+		return fmt.sbprint(&sb, "}")
 	}
+
+	fmt.sbprintfln(&sb, "Matrix(%d,%d)", a.row, a.col)
+	for i in 0 ..< a.row {
+		fmt.sbprintf(&sb, "%s", to_string(a.m[i][0], decimal = decimal, allocator = allocator))
+		for j in 1 ..< a.col {
+			fmt.sbprintf(
+				&sb,
+				"\t%s",
+				to_string(a.m[i][j], decimal = decimal, allocator = allocator),
+			)
+		}
+		fmt.sbprintln(&sb)
+	}
+	return fmt.sbprint(&sb)
 }
 
 matrix_add :: proc(
@@ -185,7 +190,7 @@ matrix_rref_in_place :: proc(a: ^RationalMatrix) {
 		cof := a.m[r][c]
 		a.m[r][c] = Rational{1, 1}
 		for ci := c + 1; ci < a.col; ci += 1 {
-			a.m[r][ci] = div(a.m[r][ci], cof)
+			a.m[r][ci], _ = div(a.m[r][ci], cof)
 		}
 		// make following row current column 0
 		for ri := r + 1; ri < a.row; ri += 1 {

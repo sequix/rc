@@ -55,7 +55,7 @@ next_token :: proc(r: ^reader.Reader) -> (tk: Token) {
 		tk.type = .Variable
 		tk.name = u8(reader.getchar(r))
 	case:
-		fmt.eprintfln("invalid character '%c'", c)
+		fmt.eprintfln("Error at line #%d: invalid character '%c'", r.lno, c)
 		os.exit(1)
 	}
 	return
@@ -87,18 +87,22 @@ parse_word :: proc(r: ^reader.Reader) -> (tk: Token) {
 	reader.ungetc(r, c)
 	word := string(buf[:bufp])
 	switch word {
+	case "popq":
+		tk.type = .PopQuietly
 	case "pop":
 		tk.type = .Pop
-	case "print", "p":
-		tk.type = .Print
-	case "ref", "r":
+	case "stack":
+		tk.type = .PrintStack
+	case "vars":
+		tk.type = .PrintVars
+	case "ref":
 		tk.type = .RREF
-	case "to_decimal":
-		tk.type = .ToDeciaml
 	case "inv":
 		tk.type = .Inverse
+	case "to_decimal":
+		tk.type = .ToDeciaml
 	case:
-		fmt.eprintfln("invalid word '%s'", word)
+		fmt.eprintfln("Error at line #%d: invalid word '%s'", r.lno, word)
 		os.exit(1)
 	}
 	return tk
@@ -140,7 +144,6 @@ parse_rational :: proc(r: ^reader.Reader, c: i16) -> (tk: Token) {
 		tk.rnum.den = i32(strconv.atoi(string(buf[:bufp])))
 		bufp = 0
 	}
-	// TODO /<invalid> will not ungetc /
 	reader.ungetc(r, i16(c))
 	return
 }
@@ -152,15 +155,14 @@ parse_assign :: proc(r: ^reader.Reader) -> (tk: Token) {
 	tk.type = .Assign
 
 	c = reader.getchar(r)
-	switch c {
-	case 'a' ..= 'z', 'A' ..= 'Z':
+	switch {
+	case unicode.is_letter(rune(c)):
 		tk.name = u8(c)
-	case:
-		fmt.eprintfln("expected variable name [A-Za-z] got: '%c'", c)
-		os.exit(1)
+		c = reader.getchar(r)
+	case c == '(':
+	// unnamed assign
 	}
 
-	c = reader.getchar(r)
 	if c != '(' {
 		reader.ungetc(r, c)
 		return
@@ -198,7 +200,7 @@ parse_assign :: proc(r: ^reader.Reader) -> (tk: Token) {
 			bufp = 0
 			return
 		}
-		fmt.eprintfln("expected ')' got '%c'", c)
+		fmt.eprintfln("Error at line #%d: expected ')' got '%c'", r.lno, c)
 		os.exit(1)
 	}
 	return

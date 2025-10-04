@@ -155,12 +155,15 @@ mul :: proc(a, b: Rational) -> Rational {
 	return a
 }
 
-div :: proc(a, b: Rational) -> Rational {
+div :: proc(a, b: Rational) -> (Rational, Error) {
+	if b.num == 0 {
+		return {}, .DivideByZero
+	}
 	a := a
 	a.num = a.num * b.den
 	a.den = a.den * b.num
 	reduce(&a)
-	return a
+	return a, nil
 }
 
 cmp :: proc(a, b: Rational) -> int {

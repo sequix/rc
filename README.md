@@ -6,4 +6,3 @@ TODO
 - arbitary precision
 - support rune
 - generate parser code with lex and yacc/bison
-- unit test

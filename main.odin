@@ -1,11 +1,12 @@
 package main
 import "core:fmt"
+import "core:io"
 import "core:os"
 import "core:strconv"
 import "rational"
 import "reader"
 
-// [a-zA-Z] -> Variable
+output: io.Writer
 variableMap: map[u8]^Variable
 variableStack: [dynamic]^Variable
 
@@ -16,6 +17,8 @@ main :: proc() {
 	}
 
 	input := os.stdin
+	output = os.stream_from_handle(os.stdout)
+
 	if len(os.args) == 2 {
 		err: os.Error
 		input, err = os.open(os.args[1])
@@ -28,20 +31,32 @@ main :: proc() {
 
 	r: reader.Reader
 	buf: [1024]u8
-	err: Error
-	tk: Token
 	reader.init(&r, os.stream_from_handle(input), buf[:])
+	process(&r)
+}
 
-	mainLoop: for {
-		tk = next_token(&r)
+process :: proc(r: ^reader.Reader) {
+	tk: Token
+	err: Error
+	processLoop: for {
+		tk = next_token(r)
 		switch tk.type {
 		case .EOF:
-			op_print()
-			break mainLoop
-		case .Print:
-			op_print()
+			if len(variableStack) == 1 {
+				op_pop()
+			}
+			if len(variableStack) > 1 {
+				op_print_stack()
+			}
+			break processLoop
+		case .PrintStack:
+			op_print_stack()
+		case .PrintVars:
+			op_print_vars()
 		case .Rational:
 			op_rational(tk)
+		case .PopQuietly:
+			err = op_pop(print = false)
 		case .Pop:
 			err = op_pop()
 		case .ToDeciaml:
@@ -64,46 +79,49 @@ main :: proc() {
 			err = op_inverse()
 		}
 		if err != nil {
-			print_error(&r, tk, err)
-			os.exit(1)
+			print_error(r, tk, err)
 		}
 	}
 }
 
 print_error :: proc(r: ^reader.Reader, tk: Token, err: Error) {
 	defer free_all(context.temp_allocator)
-	ts := token_to_string(tk, allocator = context.temp_allocator)
-	fmt.eprintfln("Error at line #%d: %s %s", r.lno, ts, err)
+	ts := token_to_string(tk, context.temp_allocator)
+	fmt.wprintfln(output, "Error at line #%d: %s %s", r.lno, ts, err)
 }
 
-op_print :: proc() {
+op_print_vars :: proc() {
 	defer free_all(context.temp_allocator)
-	if len(variableStack) > 1 {
-		fmt.printf("stack(%d): ", len(variableStack))
-		for v in variableStack {
-			//fmt.printf("%s", typeid_of(type_of(v)))
-			switch v.type {
-			case .Matrix:
-				fmt.printf("%s ", rational.matrix_to_string(v.m, context.temp_allocator))
-			case .Rational:
-				fmt.printf("%s ", rational.to_string(v.rnum, allocator = context.temp_allocator))
-			}
-		}
-		fmt.println()
-		return
-	}
-	if len(variableStack) == 1 {
-		print_variable(variableStack[0])
+	for name, v in variableMap {
+		fmt.wprintfln(
+			output,
+			"%c = %s",
+			name,
+			variable_to_string(v, allocator = context.temp_allocator),
+		)
 	}
 }
 
-op_pop :: proc() -> Error {
+op_print_stack :: proc() {
+	defer free_all(context.temp_allocator)
+	for v in variableStack {
+		fmt.wprintln(output, variable_to_string(v, allocator = context.temp_allocator))
+	}
+}
+
+op_pop :: proc(print := true) -> Error {
 	if len(variableStack) == 0 {
 		return .OperandsNotEnough
 	}
 	v := pop(&variableStack)
 	defer free(v)
-	print_variable(v)
+	if print {
+		defer free_all(context.temp_allocator)
+		fmt.wprint(
+			output,
+			variable_to_string(v, single_line = false, allocator = context.temp_allocator),
+		)
+	}
 	return nil
 }
 
@@ -113,11 +131,14 @@ op_to_decimal :: proc() -> Error {
 	}
 	v := pop(&variableStack)
 	defer free(v)
-	defer free_all(context.temp_allocator)
 	if v.type != .Rational {
 		return .ExpectedRational
 	}
-	fmt.println(rational.to_string(v.rnum, decimal = true, allocator = context.temp_allocator))
+	defer free_all(context.temp_allocator)
+	fmt.wprintln(
+		output,
+		rational.to_string(v.rnum, decimal = true, allocator = context.temp_allocator),
+	)
 	return nil
 }
 
@@ -148,7 +169,11 @@ op_assign :: proc(tk: Token) -> Error {
 		pv := pop(&variableStack)
 		defer free_variable(pv)
 		nv := clone_variable(pv^)
-		variableMap[tk.name] = nv
+		if tk.name != 0 {
+			variableMap[tk.name] = nv
+		} else {
+			append(&variableStack, nv)
+		}
 		return nil
 	}
 
@@ -167,11 +192,14 @@ op_assign :: proc(tk: Token) -> Error {
 			m.m[i][j] = v.rnum
 		}
 	}
-	//rational.print_matrix(m)
 	nv := new(Variable)
 	nv.type = .Matrix
 	nv.m = m
-	variableMap[tk.name] = nv
+	if tk.name != 0 {
+		variableMap[tk.name] = nv
+	} else {
+		append(&variableStack, nv)
+	}
 	return nil
 }
 
@@ -266,7 +294,7 @@ op_div :: proc() -> Error {
 	}
 	nv := new(Variable)
 	nv.type = .Rational
-	nv.rnum = rational.div(a.rnum, b.rnum)
+	nv.rnum = rational.div(a.rnum, b.rnum) or_return
 	append(&variableStack, nv)
 	return nil
 }
