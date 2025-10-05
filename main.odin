@@ -57,12 +57,12 @@ process :: proc(r: ^reader.Reader) {
 			op_print_vars()
 		case .Rational:
 			op_rational(tk)
+		case .PopDecimal:
+			err = op_pop(decimal = true)
 		case .PopQuietly:
 			err = op_pop(print = false)
 		case .Pop:
 			err = op_pop()
-		case .ToDeciaml:
-			err = op_to_decimal()
 		case .Variable:
 			err = op_variable(tk)
 		case .Assign:
@@ -81,15 +81,14 @@ process :: proc(r: ^reader.Reader) {
 			err = op_inverse()
 		}
 		if err != nil {
-			print_error(r, tk, err)
+			print_error(r, err)
+			err = nil
 		}
 	}
 }
 
-print_error :: proc(r: ^reader.Reader, tk: Token, err: Error) {
-	defer free_all(context.temp_allocator)
-	ts := token_to_string(tk, context.temp_allocator)
-	fmt.wprintfln(output, "Error at line #%d: %s %s", r.lno, ts, err)
+print_error :: proc(r: ^reader.Reader, err: Error) {
+	fmt.wprintfln(output, "Error at line #%d: %s", r.lno, err)
 }
 
 op_print_vars :: proc() {
@@ -111,7 +110,7 @@ op_print_stack :: proc() {
 	}
 }
 
-op_pop :: proc(print := true) -> Error {
+op_pop :: proc(decimal := false, print := true) -> Error {
 	if len(variableStack) == 0 {
 		return .OperandsNotEnough
 	}
@@ -121,26 +120,14 @@ op_pop :: proc(print := true) -> Error {
 		defer free_all(context.temp_allocator)
 		fmt.wprint(
 			output,
-			variable_to_string(v, single_line = false, allocator = context.temp_allocator),
+			variable_to_string(
+				v,
+				decimal = decimal,
+				single_line = false,
+				allocator = context.temp_allocator,
+			),
 		)
 	}
-	return nil
-}
-
-op_to_decimal :: proc() -> Error {
-	if len(variableStack) == 0 {
-		return .OperandsNotEnough
-	}
-	v := pop(&variableStack)
-	defer free(v)
-	if v.type != .Rational {
-		return .ExpectedRational
-	}
-	defer free_all(context.temp_allocator)
-	fmt.wprintln(
-		output,
-		rational.to_string(v.rnum, decimal = true, allocator = context.temp_allocator),
-	)
 	return nil
 }
 

@@ -52,13 +52,19 @@ free_variable :: proc(v: ^Variable) {
 variable_to_string :: proc(
 	v: ^Variable,
 	single_line := true,
+	decimal := false,
 	allocator := context.allocator,
 ) -> string {
 	switch v.type {
 	case .Matrix:
-		return rational.matrix_to_string(v.m, single_line = single_line, allocator = allocator)
+		return rational.matrix_to_string(
+			v.m,
+			decimal = decimal,
+			single_line = single_line,
+			allocator = allocator,
+		)
 	case .Rational:
-		return rational.to_string(v.rnum, allocator = allocator)
+		return rational.to_string(v.rnum, decimal = decimal, allocator = allocator)
 	}
 	return "unreachable"
 }
@@ -68,7 +74,6 @@ TokenType :: enum {
 	Rational,
 	Assign,
 	Variable,
-	ToDeciaml,
 	Inverse,
 	Add,
 	Sub,
@@ -79,6 +84,7 @@ TokenType :: enum {
 	PrintVars,
 	Pop,
 	PopQuietly,
+	PopDecimal,
 }
 
 Token :: struct {

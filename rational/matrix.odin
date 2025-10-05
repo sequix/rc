@@ -7,6 +7,7 @@ Error :: enum {
 	None,
 	MatrixMismatchShape,
 	MatrixNotInvertible,
+	MatrixNotSquare,
 	DivideByZero,
 }
 
@@ -172,21 +173,22 @@ matrix_rref_in_place :: proc(a: ^RationalMatrix) {
 	r := 0
 	c := 0
 	for ; r < a.row && c < a.col; r, c = r + 1, c + 1 {
-		// find row with max absolute value of column c
-		rmax := r
-		for ri := r + 1; ri < a.row; ri += 1 {
-			if cmp(a.m[ri][c], a.m[rmax][c]) > 0 {
-				rmax = ri
+		// find frist row with non-zero
+		rn0 := -1
+		for ri := r; ri < a.row; ri += 1 {
+			if a.m[ri][c].num != 0 {
+				rn0 = ri
+				break
 			}
 		}
-		if a.m[rmax][c].num == 0 {
+		if rn0 == -1 {
 			continue
 		}
-		// make rmax row current row
-		if rmax != r {
-			a.m[rmax], a.m[r] = a.m[r], a.m[rmax]
+		// make m[r][c] non-zero by swapping rows
+		if rn0 != r {
+			a.m[rn0], a.m[r] = a.m[r], a.m[rn0]
 		}
-		// make current row curent column 1
+		// make m[r][c] 1 by divide row with m[r][c]
 		cof := a.m[r][c]
 		a.m[r][c] = Rational{1, 1}
 		for ci := c + 1; ci < a.col; ci += 1 {
@@ -240,7 +242,7 @@ matrix_inverse :: proc(
 	Error,
 ) {
 	if a.row != a.col {
-		return nil, .MatrixNotInvertible
+		return nil, .MatrixNotSquare
 	}
 	t := new_matrix(a.row, a.col << 1, allocator = allocator)
 	defer free_matrix(t)

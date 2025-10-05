@@ -1,10 +1,56 @@
 package rational
 import "core:fmt"
+import "core:os"
+import "core:strconv"
 import "core:strings"
 
 Rational :: struct {
 	num: i32,
 	den: i32,
+}
+
+from_string :: proc(s: string) -> Rational {
+	defer free_all(context.temp_allocator)
+	if strings.contains(s, "/") {
+		fs, _ := strings.split_n(s, "/", 2, context.temp_allocator)
+		r := Rational {
+			num = i32(strconv.atoi(fs[0])),
+			den = i32(strconv.atoi(fs[1])),
+		}
+		reduce(&r)
+		return r
+	}
+	if strings.contains(s, ".") {
+		integerPart := Rational{0, 1}
+		fixedPart := Rational{0, 1}
+		loopPart := Rational{0, 1}
+
+		fs, _ := strings.split_n(s, ".", 2, context.temp_allocator)
+		if len(fs[0]) > 0 {
+			integerPart.num = i32(strconv.atoi(fs[0]))
+		}
+
+		fs, _ = strings.split_n(fs[1], "(", 2, context.temp_allocator)
+		fixedPartLen := i32(len(fs[0]))
+		if fixedPartLen > 0 {
+			fixedPart.num = i32(strconv.atoi(fs[0]))
+			fixedPart.den = pow(10, fixedPartLen)
+			reduce(&fixedPart)
+		}
+
+		if len(fs) == 2 {
+			loopPartStr := strings.trim_right(fs[1], ")")
+			loopPartLen := i32(len(loopPartStr))
+			if loopPartLen > 0 {
+				loopPart.num = i32(strconv.atoi(loopPartStr))
+				loopPart.den = pow(10, loopPartLen) - 1
+				reduce(&loopPart)
+				loopPart, _ = div(loopPart, Rational{pow(10, fixedPartLen), 1})
+			}
+		}
+		return add(add(integerPart, fixedPart), loopPart)
+	}
+	return Rational{i32(strconv.atoi(s)), 1}
 }
 
 to_string :: proc(r: Rational, decimal := false, allocator := context.allocator) -> string {

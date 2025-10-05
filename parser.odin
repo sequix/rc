@@ -3,6 +3,7 @@ import "core:fmt"
 import "core:io"
 import "core:os"
 import "core:strconv"
+import "core:strings"
 import "core:unicode"
 import "rational"
 import "reader"
@@ -41,7 +42,7 @@ next_token :: proc(r: ^reader.Reader) -> (tk: Token) {
 			tk = parse_add_sub(c)
 			return
 		}
-		if unicode.is_digit(rune(nc)) {
+		if unicode.is_digit(rune(nc)) || nc == '.' {
 			reader.ungetc(r, nc)
 			tk = parse_rational(r, c)
 			return
@@ -49,7 +50,7 @@ next_token :: proc(r: ^reader.Reader) -> (tk: Token) {
 		reader.ungetc(r, nc)
 		tk = parse_add_sub(c)
 		return
-	case '0' ..= '9':
+	case '0' ..= '9', '.':
 		tk = parse_rational(r, c)
 	case '$':
 		tk.type = .Variable
@@ -87,6 +88,8 @@ parse_word :: proc(r: ^reader.Reader) -> (tk: Token) {
 	reader.ungetc(r, c)
 	word := string(buf[:bufp])
 	switch word {
+	case "popd":
+		tk.type = .PopDecimal
 	case "popq":
 		tk.type = .PopQuietly
 	case "pop":
@@ -99,8 +102,6 @@ parse_word :: proc(r: ^reader.Reader) -> (tk: Token) {
 		tk.type = .RREF
 	case "inv":
 		tk.type = .Inverse
-	case "to_decimal":
-		tk.type = .ToDeciaml
 	case:
 		fmt.eprintfln("Error at line #%d: invalid word '%s'", r.lno, word)
 		os.exit(1)
@@ -109,42 +110,61 @@ parse_word :: proc(r: ^reader.Reader) -> (tk: Token) {
 }
 
 parse_rational :: proc(r: ^reader.Reader, c: i16) -> (tk: Token) {
+	defer free_all(context.temp_allocator)
 	c := c
-	buf: [16]u8
-	bufp := 0
-	tk.type = .Rational
-	tk.rnum.den = 1
+	sb: strings.Builder
+	strings.builder_init_len_cap(&sb, 0, 16, context.temp_allocator)
 
 	if c == '+' || c == '-' || unicode.is_digit(rune(c)) {
-		buf[bufp] = u8(c)
-		bufp += 1
-	}
-	for {
-		c = reader.getchar(r)
-		if unicode.is_digit(rune(c)) {
-			buf[bufp] = u8(c)
-			bufp += 1
-			continue
-		}
-		break
-	}
-	tk.rnum.num = i32(strconv.atoi(string(buf[:bufp])))
-	bufp = 0
-
-	if c == '/' {
+		fmt.sbprintf(&sb, "%c", c)
 		for {
 			c = reader.getchar(r)
 			if unicode.is_digit(rune(c)) {
-				buf[bufp] = u8(c)
-				bufp += 1
+				fmt.sbprintf(&sb, "%c", c)
 				continue
 			}
 			break
 		}
-		tk.rnum.den = i32(strconv.atoi(string(buf[:bufp])))
-		bufp = 0
 	}
-	reader.ungetc(r, i16(c))
+	switch c {
+	case '/':
+		fmt.sbprintf(&sb, "%c", c)
+		for {
+			c = reader.getchar(r)
+			if unicode.is_digit(rune(c)) {
+				fmt.sbprintf(&sb, "%c", c)
+				continue
+			}
+			break
+		}
+		reader.ungetc(r, i16(c))
+	case '.':
+		fmt.sbprintf(&sb, "%c", c)
+		for {
+			c = reader.getchar(r)
+			if unicode.is_digit(rune(c)) {
+				fmt.sbprintf(&sb, "%c", c)
+				continue
+			}
+			break
+		}
+		if c == '(' {
+			fmt.sbprintf(&sb, "%c", c)
+			for {
+				c = reader.getchar(r)
+				if unicode.is_digit(rune(c)) {
+					fmt.sbprintf(&sb, "%c", c)
+					continue
+				}
+				break
+			}
+			if c == ')' {
+				fmt.sbprintf(&sb, "%c", c)
+			}
+		}
+	}
+	tk.type = .Rational
+	tk.rnum = rational.from_string(fmt.sbprint(&sb))
 	return
 }
 

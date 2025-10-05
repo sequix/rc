@@ -1,8 +1,8 @@
 # rc
 
 TODO
-- decimal to rational
+- determinant
+- LU decomposition
 - conversion between rational and float
 - arbitary precision
 - support rune
-- generate parser code with lex and yacc/bison
