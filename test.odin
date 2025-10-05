@@ -27,8 +27,14 @@ test_rational :: proc(t: ^testing.T) {
 
 	// decimal format
 	check(t, ".", "0")
+	check(t, "-.", "0")
+	check(t, "+.", "0")
 	check(t, ".(3)", "1/3")
+	check(t, "+.(3)", "1/3")
+	check(t, "-.(3)", "-1/3")
 	check(t, "12.34(56)", "61111/4950")
+	check(t, "+12.34(56)", "61111/4950")
+	check(t, "-12.34(56)", "-61111/4950")
 
 	// add
 	check(t, "1/2  1/2   +", "1")

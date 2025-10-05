@@ -10,6 +10,7 @@ Rational :: struct {
 }
 
 from_string :: proc(s: string) -> Rational {
+	s := s
 	defer free_all(context.temp_allocator)
 	if strings.contains(s, "/") {
 		fs, _ := strings.split_n(s, "/", 2, context.temp_allocator)
@@ -24,6 +25,12 @@ from_string :: proc(s: string) -> Rational {
 		integerPart := Rational{0, 1}
 		fixedPart := Rational{0, 1}
 		loopPart := Rational{0, 1}
+		sign := Rational{1, 1}
+
+		if s[0] == '-' {
+			sign.num = -1
+		}
+		s = strings.trim_left(s, "+-")
 
 		fs, _ := strings.split_n(s, ".", 2, context.temp_allocator)
 		if len(fs[0]) > 0 {
@@ -48,7 +55,7 @@ from_string :: proc(s: string) -> Rational {
 				loopPart, _ = div(loopPart, Rational{pow(10, fixedPartLen), 1})
 			}
 		}
-		return add(add(integerPart, fixedPart), loopPart)
+		return mul(add(add(integerPart, fixedPart), loopPart), sign)
 	}
 	return Rational{i32(strconv.atoi(s)), 1}
 }
