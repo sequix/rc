@@ -79,6 +79,8 @@ process :: proc(r: ^reader.Reader) {
 			err = op_rref()
 		case .Inverse:
 			err = op_inverse()
+		case .Determinant:
+			err = op_determinant()
 		}
 		if err != nil {
 			print_error(r, err)
@@ -316,6 +318,22 @@ op_inverse :: proc() -> Error {
 	nv := new(Variable)
 	nv.type = .Matrix
 	nv.m = rational.matrix_inverse(a.m) or_return
+	append(&variableStack, nv)
+	return nil
+}
+
+op_determinant :: proc() -> Error {
+	if len(variableStack) == 0 {
+		return .OperandsNotEnough
+	}
+	a := pop(&variableStack)
+	defer free_variable(a)
+	if a.type != .Matrix {
+		return .ExpectedMatrix
+	}
+	nv := new(Variable)
+	nv.type = .Rational
+	nv.rnum = rational.matrix_determinant(a.m) or_return
 	append(&variableStack, nv)
 	return nil
 }

@@ -94,7 +94,7 @@ test_matrix :: proc(t: ^testing.T) {
 	// martix rref
 	check(t, "1 2 3 4 1 6 =(2,3) ref", "Matrix(2,3)\n1\t0\t9/7\n0\t1\t6/7")
 
-	// martix inverse
+	// matrix inverse
 	input := `1 1 1 1 2 3 1 4 5 =(3,3) inv`
 	output := `Matrix(3,3)
 1	1/2	-1/2
@@ -125,6 +125,17 @@ test_matrix :: proc(t: ^testing.T) {
 
 	input = `1 1 1 2 2 2 1 4 5 =(3,3) inv`
 	check(t, input, `Error at line #1: MatrixNotInvertible`)
+
+	// matrix determinant
+	check(t, "0 =(1) det", "0")
+	check(t, "42 =(1) det", "42")
+	check(t, "-42 =(1) det", "-42")
+
+	check(t, "1 1 2 2 =(2) det", "0")
+	check(t, "25 20 14 13 =(2) det", "45")
+
+	check(t, "5 -3 2 -7 3 -7 9 -5 5 =(3) det", "0")
+	check(t, "1 -4 2 -2 8 -9 -1 7 0 =(3) det", "15")
 }
 
 @(test)

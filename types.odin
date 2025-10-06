@@ -80,6 +80,7 @@ TokenType :: enum {
 	Mul,
 	Div,
 	RREF,
+	Determinant,
 	PrintStack,
 	PrintVars,
 	Pop,

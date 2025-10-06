@@ -102,6 +102,8 @@ parse_word :: proc(r: ^reader.Reader) -> (tk: Token) {
 		tk.type = .RREF
 	case "inv":
 		tk.type = .Inverse
+	case "det":
+		tk.type = .Determinant
 	case:
 		fmt.eprintfln("Error at line #%d: invalid word '%s'", r.lno, word)
 		os.exit(1)

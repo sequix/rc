@@ -276,3 +276,49 @@ matrix_inverse :: proc(
 	}
 	return ret, nil
 }
+
+matrix_determinant :: proc(a: ^RationalMatrix) -> (Rational, Error) {
+	if a.row != a.col {
+		return {}, .MatrixNotSquare
+	}
+	sign := Rational{1, 1}
+	t := clone_matrix(a)
+	defer free_matrix(t)
+
+	for k := 0; k < t.row; k += 1 {
+		// find frist row with non-zero
+		rn0 := -1
+		for ri := k; ri < t.row; ri += 1 {
+			if t.m[ri][k].num != 0 {
+				rn0 = ri
+				break
+			}
+		}
+		if rn0 == -1 {
+			return {0, 1}, nil
+		}
+		// make m[r][c] non-zero by swapping rows
+		if rn0 != k {
+			t.m[rn0], t.m[k] = t.m[k], t.m[rn0]
+			sign.num = -sign.num
+		}
+		// make following row current column 0
+		for ri := k + 1; ri < t.row; ri += 1 {
+			if t.m[ri][k].num == 0 {
+				continue
+			}
+			cof, _ := div(t.m[ri][k], t.m[k][k])
+			t.m[ri][k] = Rational{0, 1}
+			for ci := k + 1; ci < t.col; ci += 1 {
+				tr := mul(t.m[k][ci], cof)
+				t.m[ri][ci] = sub(t.m[ri][ci], tr)
+			}
+		}
+	}
+
+	det := Rational{1, 1}
+	for k := 0; k < t.row; k += 1 {
+		det = mul(det, t.m[k][k])
+	}
+	return mul(det, sign), nil
+}
